@@ -1,0 +1,230 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{% static 'css/admin-custom.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{% trans "ERP+MES+MRP Dashboard" %}</h1>
+    
+    <!-- KPI Cards -->
+    <div class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #4CAF50;">⚙</div>
+            <div class="kpi-content">
+                <div class="kpi-label">{% trans "OEE" %}</div>
+                <div class="kpi-value" id="kpi-oee">{{ kpis.oee|default:"0" }}%</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #2196F3;">📦</div>
+            <div class="kpi-content">
+                <div class="kpi-label">{% trans "Total Produced" %}</div>
+                <div class="kpi-value" id="kpi-produced">{{ kpis.total_produced|default:"0" }}</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #FF9800;">🔴</div>
+            <div class="kpi-content">
+                <div class="kpi-label">{% trans "Rejection Rate" %}</div>
+                <div class="kpi-value" id="kpi-rejection">{{ kpis.rejection_rate|default:"0" }}%</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #9C27B0;">💰</div>
+            <div class="kpi-content">
+                <div class="kpi-label">{% trans "Monthly Revenue" %}</div>
+                <div class="kpi-value" id="kpi-revenue">${{ kpis.revenue|default:"0"|floatformat:2 }}</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #F44336;">⚠</div>
+            <div class="kpi-content">
+                <div class="kpi-label">{% trans "Low Stock Items" %}</div>
+                <div class="kpi-value" id="kpi-lowstock">{{ kpis.low_stock_items|default:"0" }}</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: #00BCD4;">📋</div>
+            <div class="kpi-content">
+                <div class="kpi-label">{% trans "Active Work Orders" %}</div>
+                <div class="kpi-value" id="kpi-active-wo">{{ kpis.active_work_orders|default:"0" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-container">
+        <div class="chart-card">
+            <h3>{% trans "Daily Production (Last 7 Days)" %}</h3>
+            <div style="position: relative; height: 250px;">
+                <canvas id="productionChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-card">
+            <h3>{% trans "Production by Line" %}</h3>
+            <div style="position: relative; height: 250px;">
+                <canvas id="lineChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts & Activities Row -->
+    <div class="info-container">
+        <div class="info-card">
+            <h3>{% trans "Inventory Alerts" %}</h3>
+            <div id="inventory-alerts" class="alerts-list">
+                {% if inventory_alerts %}
+                    {% for alert in inventory_alerts %}
+                    <div class="alert-item severity-{{ alert.severity }}">
+                        <div class="alert-item-title">{{ alert.item }}</div>
+                        <div class="alert-item-detail">
+                            Current: {{ alert.current|floatformat:2 }} 
+                            {% if alert.minimum %}| Min: {{ alert.minimum|floatformat:2 }}{% else %}| Critical{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p style="text-align: center; color: green;">✓ All inventory levels OK</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="info-card">
+            <h3>{% trans "Recent Activities" %}</h3>
+            <div id="recent-activities" class="activity-list">
+                {% if recent_activities %}
+                    {% for activity in recent_activities %}
+                    <div class="activity-item">
+                        <div class="activity-time">{{ activity.timestamp|timesince }} ago</div>
+                        <div>
+                            <span class="activity-user">{{ activity.user }}</span>
+                            <span class="activity-desc">{{ activity.action }}: {{ activity.description }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p style="text-align: center; color: gray;">No recent activities</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="quick-links">
+        <h3>{% trans "Quick Access" %}</h3>
+        <div class="link-grid">
+            <a href="{% url 'admin:mes_workorder_changelist' %}" class="quick-link">
+                <span class="link-icon">🏭</span>
+                <span class="link-text">{% trans "Work Orders" %}</span>
+            </a>
+            <a href="{% url 'admin:erp_salesorder_changelist' %}" class="quick-link">
+                <span class="link-icon">📝</span>
+                <span class="link-text">{% trans "Sales Orders" %}</span>
+            </a>
+            <a href="{% url 'admin:mrp_inventory_changelist' %}" class="quick-link">
+                <span class="link-icon">📦</span>
+                <span class="link-text">{% trans "Inventory" %}</span>
+            </a>
+            <a href="{% url 'admin:mes_qualitycheck_changelist' %}" class="quick-link">
+                <span class="link-icon">✓</span>
+                <span class="link-text">{% trans "Quality Checks" %}</span>
+            </a>
+            <a href="{% url 'admin:erp_product_changelist' %}" class="quick-link">
+                <span class="link-icon">🏷</span>
+                <span class="link-text">{% trans "Products" %}</span>
+            </a>
+            <a href="{% url 'admin:core_logdata_changelist' %}" class="quick-link">
+                <span class="link-icon">📊</span>
+                <span class="link-text">{% trans "System Logs" %}</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Embed production data directly in template
+const productionData = {{ production_data|safe }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Production Chart
+    const productionCtx = document.getElementById('productionChart');
+    if (productionCtx && productionData.daily) {
+        new Chart(productionCtx, {
+            type: 'bar',
+            data: {
+                labels: productionData.daily.map(d => d.date),
+                datasets: [{
+                    label: 'Units Produced',
+                    data: productionData.daily.map(d => d.quantity),
+                    backgroundColor: 'rgba(76, 175, 80, 0.6)',
+                    borderColor: 'rgba(76, 175, 80, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Line Chart
+    const lineCtx = document.getElementById('lineChart');
+    if (lineCtx && productionData.by_line && productionData.by_line.length > 0) {
+        new Chart(lineCtx, {
+            type: 'doughnut',
+            data: {
+                labels: productionData.by_line.map(d => d.line),
+                datasets: [{
+                    label: 'Production by Line',
+                    data: productionData.by_line.map(d => d.quantity),
+                    backgroundColor: [
+                        'rgba(76, 175, 80, 0.6)',
+                        'rgba(33, 150, 243, 0.6)',
+                        'rgba(255, 152, 0, 0.6)',
+                        'rgba(156, 39, 176, 0.6)',
+                        'rgba(244, 67, 54, 0.6)',
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            }
+        });
+    } else {
+        lineCtx.parentElement.innerHTML = '<p style="text-align: center; color: gray; padding: 50px;">No production data available</p>';
+    }
+});
+</script>
+{% endblock %}
